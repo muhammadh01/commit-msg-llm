@@ -13,3 +13,4 @@ mlruns/
 .idea/
 .vscode/
 training/checkpoints/
+mlruns/
