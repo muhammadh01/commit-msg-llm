@@ -1,0 +1,56 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: api
+  namespace: commit-msg
+  labels:
+    app: api
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: api
+  template:
+    metadata:
+      labels:
+        app: api
+    spec:
+      containers:
+        - name: api
+          image: ghcr.io/muhammadh01/commit-msg-llm:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8000
+          env:
+            - name: REDIS_URL
+              value: "redis://redis:6379/0"
+            - name: MODEL_ID
+              value: "Qwen/Qwen2.5-0.5B"
+            - name: ADAPTER_PATH
+              value: "muhammadh01/commit-msg-llm-adapter"
+            - name: HF_TOKEN
+              valueFrom:
+                secretKeyRef: { name: api-secrets, key: HF_TOKEN }
+          readinessProbe:
+            httpGet: { path: /health, port: 8000 }
+            initialDelaySeconds: 60
+            periodSeconds: 10
+          livenessProbe:
+            httpGet: { path: /health, port: 8000 }
+            initialDelaySeconds: 120
+            periodSeconds: 30
+          resources:
+            requests: { cpu: "500m", memory: "2Gi" }
+            limits:   { cpu: "1500m", memory: "4Gi" }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: api
+  namespace: commit-msg
+spec:
+  selector:
+    app: api
+  ports:
+    - port: 80
+      targetPort: 8000

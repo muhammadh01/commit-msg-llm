@@ -16,7 +16,7 @@ try:
 except ImportError:
     redis = None
 
-MODEL_ID = os.getenv("MODEL_ID", "Qwen/Qwen2.5-1.5B")
+MODEL_ID = os.getenv("MODEL_ID", "Qwen/Qwen2.5-0.5B")
 ADAPTER_PATH = os.getenv("ADAPTER_PATH", "training/checkpoints/sanity")
 REDIS_URL = os.getenv("REDIS_URL")
 CACHE_TTL = int(os.getenv("CACHE_TTL", "3600"))
@@ -37,8 +37,15 @@ async def lifespan(app: FastAPI):
 
     tok = AutoTokenizer.from_pretrained(MODEL_ID)
     tok.pad_token = tok.eos_token
-    base = AutoModelForCausalLM.from_pretrained(MODEL_ID, dtype=torch.float16).to(device)
-    model = PeftModel.from_pretrained(base, ADAPTER_PATH).to(device)
+    base = AutoModelForCausalLM.from_pretrained(
+        MODEL_ID, dtype=torch.float16, low_cpu_mem_usage=True
+    )
+    try:
+        model = PeftModel.from_pretrained(base, ADAPTER_PATH).to(device)
+        print(f"[lifespan] adapter loaded from {ADAPTER_PATH}")
+    except Exception as e:
+        print(f"[lifespan] no adapter loaded ({e}) - using base model only")
+        model = base
     model.eval()
     state.update(tok=tok, model=model, device=device)
 
