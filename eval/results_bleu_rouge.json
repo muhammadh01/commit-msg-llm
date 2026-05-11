@@ -1,0 +1,33 @@
+{
+  "n": 20,
+  "bleu": 0.39,
+  "rouge1": 16.04,
+  "rougeL": 14.06,
+  "examples": [
+    {
+      "diff_chars": 733,
+      "ref": "make sure the charge_permission_id gets saved to the payment",
+      "pred": "Update transaction id and save payment details for charge permission id."
+    },
+    {
+      "diff_chars": 955,
+      "ref": "dependencies only in composer of submodules",
+      "pred": "Update composer.json and marketplace-composer.json files to include the latest version of Amazon Pay SDK and Amazon Pay and Login with Amazon Core Module."
+    },
+    {
+      "diff_chars": 5007,
+      "ref": "removed Amazon Pay mark from landing pages",
+      "pred": "resolution}.png');"
+    },
+    {
+      "diff_chars": 1322,
+      "ref": "make sign in button class distinct from pay button",
+      "pred": "Modify view/frontend/templates/login.phtml to use the new Amazon Sign-in button."
+    },
+    {
+      "diff_chars": 6949,
+      "ref": "Update - fixes order ID mismatch.",
+      "pred": "the order is not in the cart, then we can't settle it"
+    }
+  ]
+}

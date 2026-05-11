@@ -1,0 +1,36 @@
+{
+  "n": 5,
+  "averages": {
+    "clarity": 5.6,
+    "relevance": 3.8,
+    "conciseness": 4.2,
+    "overall": 4.53
+  },
+  "per_example": [
+    {
+      "clarity": 7,
+      "relevance": 5,
+      "conciseness": 6
+    },
+    {
+      "clarity": 8,
+      "relevance": 5,
+      "conciseness": 4
+    },
+    {
+      "clarity": 1,
+      "relevance": 1,
+      "conciseness": 1
+    },
+    {
+      "clarity": 7,
+      "relevance": 4,
+      "conciseness": 5
+    },
+    {
+      "clarity": 5,
+      "relevance": 4,
+      "conciseness": 5
+    }
+  ]
+}
