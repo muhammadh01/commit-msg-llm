@@ -1,13 +1,15 @@
 """LoRA fine-tuning of Qwen2.5-1.5B with MLflow tracking."""
+
 import json
 import os
-import torch
-import mlflow
 from pathlib import Path
+
+import mlflow
+import torch
 from datasets import Dataset
-from transformers import AutoModelForCausalLM, AutoTokenizer, TrainerCallback
 from peft import LoraConfig, get_peft_model
-from trl import SFTTrainer, SFTConfig
+from transformers import AutoModelForCausalLM, AutoTokenizer, TrainerCallback
+from trl import SFTConfig, SFTTrainer
 
 # ---------- Config (overridable via env) ----------
 MODEL_ID = os.getenv("MODEL_ID", "Qwen/Qwen2.5-1.5B")
@@ -28,8 +30,10 @@ print(f"Device: {device}")
 mlflow.set_tracking_uri("file:./mlruns")
 mlflow.set_experiment("commit-msg-llm")
 
+
 class MLflowLogger(TrainerCallback):
     """Push every logged metric into the active MLflow run."""
+
     def on_log(self, args, state, control, logs=None, **kwargs):
         if not logs:
             return
@@ -37,17 +41,20 @@ class MLflowLogger(TrainerCallback):
             if isinstance(v, (int, float)):
                 mlflow.log_metric(k, v, step=state.global_step)
 
+
 with mlflow.start_run(run_name=RUN_NAME):
-    mlflow.log_params({
-        "model_id": MODEL_ID,
-        "n_examples": N_EXAMPLES,
-        "epochs": EPOCHS,
-        "learning_rate": LR,
-        "lora_r": LORA_R,
-        "lora_alpha": LORA_ALPHA,
-        "max_len": MAX_LEN,
-        "device": device,
-    })
+    mlflow.log_params(
+        {
+            "model_id": MODEL_ID,
+            "n_examples": N_EXAMPLES,
+            "epochs": EPOCHS,
+            "learning_rate": LR,
+            "lora_r": LORA_R,
+            "lora_alpha": LORA_ALPHA,
+            "max_len": MAX_LEN,
+            "device": device,
+        }
+    )
 
     # ---------- Load tokenizer + model ----------
     print("Loading model...")
@@ -66,11 +73,12 @@ with mlflow.start_run(run_name=RUN_NAME):
     model = get_peft_model(model, lora_cfg)
     tp = sum(p.numel() for p in model.parameters() if p.requires_grad)
     ap = sum(p.numel() for p in model.parameters())
-    print(f"trainable: {tp:,} / {ap:,} ({100*tp/ap:.3f}%)")
+    print(f"trainable: {tp:,} / {ap:,} ({100 * tp / ap:.3f}%)")
     mlflow.log_metric("trainable_params", tp)
 
     # ---------- Data ----------
-    raw = [json.loads(l) for l in (DATA_DIR / "train.jsonl").open()][:N_EXAMPLES]
+    raw = [json.loads(line) for line in (DATA_DIR / "train.jsonl").open()][:N_EXAMPLES]
+
     def to_prompt(ex):
         text = (
             "Write a concise git commit message for the following diff.\n\n"
@@ -78,6 +86,7 @@ with mlflow.start_run(run_name=RUN_NAME):
             f"### Commit message:\n{ex['output']}"
         )
         return {"text": text}
+
     ds = Dataset.from_list([to_prompt(e) for e in raw])
 
     # ---------- Train ----------

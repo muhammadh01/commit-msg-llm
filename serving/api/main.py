@@ -1,13 +1,15 @@
 """FastAPI server with Redis cache for identical diffs."""
-import os
+
 import hashlib
 import json
-import torch
+import os
 from contextlib import asynccontextmanager
+
+import torch
 from fastapi import FastAPI, HTTPException
+from peft import PeftModel
 from pydantic import BaseModel, Field
 from transformers import AutoModelForCausalLM, AutoTokenizer
-from peft import PeftModel
 
 try:
     import redis
@@ -22,9 +24,11 @@ MAX_NEW_TOKENS = 40
 
 state = {}
 
+
 def _cache_key(diff: str) -> str:
     h = hashlib.sha256(diff.encode("utf-8")).hexdigest()[:16]
     return f"commit-msg:{MODEL_ID}:{h}"
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -50,15 +54,19 @@ async def lifespan(app: FastAPI):
     yield
     state.clear()
 
+
 app = FastAPI(title="commit-msg-llm", lifespan=lifespan)
+
 
 class GenerateRequest(BaseModel):
     diff: str = Field(..., min_length=10, max_length=8000)
+
 
 class GenerateResponse(BaseModel):
     message: str
     model: str
     cached: bool = False
+
 
 @app.get("/health")
 def health():
@@ -67,6 +75,7 @@ def health():
         "model_loaded": "model" in state,
         "cache_enabled": "redis" in state,
     }
+
 
 @app.post("/generate", response_model=GenerateResponse)
 def generate(req: GenerateRequest):
@@ -95,7 +104,7 @@ def generate(req: GenerateRequest):
             do_sample=False,
             pad_token_id=tok.eos_token_id,
         )
-    text = tok.decode(out[0][inputs["input_ids"].shape[1]:], skip_special_tokens=True)
+    text = tok.decode(out[0][inputs["input_ids"].shape[1] :], skip_special_tokens=True)
     msg = text.split("\n")[0].strip(" -")
 
     if r is not None:

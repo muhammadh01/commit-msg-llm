@@ -1,0 +1,7 @@
+line-length = 100
+target-version = "py311"
+exclude = [".venv", "mlruns", "data/raw", "data/processed", "training/checkpoints"]
+
+[lint]
+select = ["E", "F", "I", "W", "UP"]
+ignore = ["E501"]

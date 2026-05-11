@@ -1,9 +1,11 @@
 """Test the trained adapter on a validation example."""
+
 import json
-import torch
 from pathlib import Path
-from transformers import AutoModelForCausalLM, AutoTokenizer
+
+import torch
 from peft import PeftModel
+from transformers import AutoModelForCausalLM, AutoTokenizer
 
 MODEL_ID = "Qwen/Qwen2.5-1.5B"
 ADAPTER = "training/checkpoints/sanity"
@@ -35,9 +37,9 @@ with torch.no_grad():
         do_sample=False,
         pad_token_id=tok.eos_token_id,
     )
-generated = tok.decode(out[0][inputs["input_ids"].shape[1]:], skip_special_tokens=True)
+generated = tok.decode(out[0][inputs["input_ids"].shape[1] :], skip_special_tokens=True)
 
-print("\n" + "="*60)
+print("\n" + "=" * 60)
 print("GROUND TRUTH:", ex["output"])
 print("MODEL OUTPUT:", generated.split("\n")[0].strip())
-print("="*60)
+print("=" * 60)

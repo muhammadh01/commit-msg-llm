@@ -1,7 +1,9 @@
 """Download a small sample of CommitChronicle for inspection."""
-from datasets import load_dataset
-from pathlib import Path
+
 import json
+from pathlib import Path
+
+from datasets import load_dataset
 
 OUT = Path("data/raw/sample.jsonl")
 OUT.parent.mkdir(parents=True, exist_ok=True)
@@ -21,6 +23,6 @@ with OUT.open("w") as f:
             break
         f.write(json.dumps(row) + "\n")
         if (i + 1) % 100 == 0:
-            print(f"  saved {i+1}/{N}")
+            print(f"  saved {i + 1}/{N}")
 
 print(f"Done. Saved {N} examples to {OUT}")

@@ -1,4 +1,5 @@
 """Filter + format CommitChronicle rows into prompt/completion pairs."""
+
 import json
 import random
 from pathlib import Path
@@ -12,6 +13,7 @@ MIN_DIFF, MAX_DIFF = 100, 8000
 MIN_MSG, MAX_MSG = 10, 250
 SKIP_PREFIXES = ("Merge ", "Revert ", "[skip ci]")
 
+
 def format_input(row):
     """Turn the row's file changes into a readable diff string."""
     parts = []
@@ -19,6 +21,7 @@ def format_input(row):
         path = m["new_path"] or m["old_path"]
         parts.append(f"# {m['change_type']} {path}\n{m['diff']}")
     return "\n\n".join(parts)
+
 
 def keep(row):
     msg = row["message"].strip()
@@ -31,16 +34,19 @@ def keep(row):
         return False
     return True
 
+
 examples = []
 with RAW.open() as f:
     for line in f:
         row = json.loads(line)
         if not keep(row):
             continue
-        examples.append({
-            "input": format_input(row),
-            "output": row["message"].strip(),
-        })
+        examples.append(
+            {
+                "input": format_input(row),
+                "output": row["message"].strip(),
+            }
+        )
 
 print(f"Kept {len(examples)} / 500 examples after filtering")
 
@@ -48,7 +54,11 @@ print(f"Kept {len(examples)} / 500 examples after filtering")
 random.seed(42)
 random.shuffle(examples)
 n = len(examples)
-train, val, test = examples[:int(n*0.8)], examples[int(n*0.8):int(n*0.9)], examples[int(n*0.9):]
+train, val, test = (
+    examples[: int(n * 0.8)],
+    examples[int(n * 0.8) : int(n * 0.9)],
+    examples[int(n * 0.9) :],
+)
 
 for name, data in [("train", train), ("val", val), ("test", test)]:
     p = OUT_DIR / f"{name}.jsonl"
