@@ -1,0 +1,15 @@
+.venv/
+__pycache__/
+*.pyc
+.git/
+.github/
+data/raw/
+data/processed/
+mlruns/
+notebooks/
+.DS_Store
+*.ipynb
+README.md
+.idea/
+.vscode/
+tests/

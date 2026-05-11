@@ -1,0 +1,26 @@
+services:
+  api:
+    build:
+      context: .
+      dockerfile: serving/Dockerfile
+    container_name: commit-msg-api
+    ports:
+      - "8000:8000"
+    environment:
+      MODEL_ID: "Qwen/Qwen2.5-1.5B"
+      ADAPTER_PATH: "/adapter"
+      REDIS_URL: "redis://redis:6379/0"
+    volumes:
+      - ./training/checkpoints/sanity:/adapter:ro
+      - hf-cache:/cache/huggingface
+    depends_on:
+      - redis
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    container_name: commit-msg-redis
+    restart: unless-stopped
+
+volumes:
+  hf-cache:
