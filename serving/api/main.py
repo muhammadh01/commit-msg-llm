@@ -1,5 +1,7 @@
-"""FastAPI server: takes a git diff, returns a commit message."""
+"""FastAPI server with Redis cache for identical diffs."""
 import os
+import hashlib
+import json
 import torch
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException
@@ -7,31 +9,43 @@ from pydantic import BaseModel, Field
 from transformers import AutoModelForCausalLM, AutoTokenizer
 from peft import PeftModel
 
+try:
+    import redis
+except ImportError:
+    redis = None
+
 MODEL_ID = os.getenv("MODEL_ID", "Qwen/Qwen2.5-1.5B")
 ADAPTER_PATH = os.getenv("ADAPTER_PATH", "training/checkpoints/sanity")
+REDIS_URL = os.getenv("REDIS_URL")
+CACHE_TTL = int(os.getenv("CACHE_TTL", "3600"))
 MAX_NEW_TOKENS = 40
 
-state = {}  # holds model + tokenizer
+state = {}
+
+def _cache_key(diff: str) -> str:
+    h = hashlib.sha256(diff.encode("utf-8")).hexdigest()[:16]
+    return f"commit-msg:{MODEL_ID}:{h}"
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Load model once on startup."""
     device = "mps" if torch.backends.mps.is_available() else "cpu"
     print(f"[lifespan] device={device}")
-    print("[lifespan] loading tokenizer...")
+
     tok = AutoTokenizer.from_pretrained(MODEL_ID)
     tok.pad_token = tok.eos_token
-
-    print("[lifespan] loading base model...")
     base = AutoModelForCausalLM.from_pretrained(MODEL_ID, dtype=torch.float16).to(device)
-
-    print(f"[lifespan] loading adapter from {ADAPTER_PATH}...")
     model = PeftModel.from_pretrained(base, ADAPTER_PATH).to(device)
     model.eval()
+    state.update(tok=tok, model=model, device=device)
 
-    state["tok"] = tok
-    state["model"] = model
-    state["device"] = device
+    if REDIS_URL and redis is not None:
+        try:
+            r = redis.Redis.from_url(REDIS_URL, decode_responses=True, socket_timeout=2)
+            r.ping()
+            state["redis"] = r
+            print(f"[lifespan] redis connected: {REDIS_URL}")
+        except Exception as e:
+            print(f"[lifespan] redis unavailable ({e}) — running without cache")
     print("[lifespan] ready.")
     yield
     state.clear()
@@ -44,15 +58,29 @@ class GenerateRequest(BaseModel):
 class GenerateResponse(BaseModel):
     message: str
     model: str
+    cached: bool = False
 
 @app.get("/health")
 def health():
-    return {"status": "ok", "model_loaded": "model" in state}
+    return {
+        "status": "ok",
+        "model_loaded": "model" in state,
+        "cache_enabled": "redis" in state,
+    }
 
 @app.post("/generate", response_model=GenerateResponse)
 def generate(req: GenerateRequest):
     if "model" not in state:
         raise HTTPException(503, "Model not loaded")
+    r = state.get("redis")
+    key = _cache_key(req.diff)
+
+    if r is not None:
+        cached = r.get(key)
+        if cached:
+            data = json.loads(cached)
+            return GenerateResponse(message=data["message"], model=data["model"], cached=True)
+
     tok, model, device = state["tok"], state["model"], state["device"]
     prompt = (
         "Write a concise git commit message for the following diff.\n\n"
@@ -68,5 +96,12 @@ def generate(req: GenerateRequest):
             pad_token_id=tok.eos_token_id,
         )
     text = tok.decode(out[0][inputs["input_ids"].shape[1]:], skip_special_tokens=True)
-    first_line = text.split("\n")[0].strip(" -")
-    return GenerateResponse(message=first_line, model=MODEL_ID)
+    msg = text.split("\n")[0].strip(" -")
+
+    if r is not None:
+        try:
+            r.setex(key, CACHE_TTL, json.dumps({"message": msg, "model": MODEL_ID}))
+        except Exception:
+            pass
+
+    return GenerateResponse(message=msg, model=MODEL_ID, cached=False)
