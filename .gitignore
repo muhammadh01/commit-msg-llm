@@ -12,3 +12,4 @@ mlruns/
 .ipynb_checkpoints/
 .idea/
 .vscode/
+training/checkpoints/
