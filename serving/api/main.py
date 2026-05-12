@@ -3,11 +3,14 @@
 import hashlib
 import json
 import os
+import time
 from contextlib import asynccontextmanager
 
 import torch
 from fastapi import FastAPI, HTTPException
 from peft import PeftModel
+from prometheus_client import Counter, Histogram
+from prometheus_fastapi_instrumentator import Instrumentator
 from pydantic import BaseModel, Field
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
@@ -63,6 +66,14 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="commit-msg-llm", lifespan=lifespan)
+# Custom metrics
+GEN_TOTAL = Counter("generate_total", "Total /generate calls", ["status"])
+GEN_LATENCY = Histogram(
+    "generate_latency_seconds", "Inference latency", buckets=[0.1, 0.25, 0.5, 1, 2, 5, 10, 20]
+)
+CACHE_EVENTS = Counter("cache_events_total", "Cache hits / misses", ["event"])
+
+Instrumentator().instrument(app).expose(app)
 
 
 class GenerateRequest(BaseModel):
@@ -87,15 +98,21 @@ def health():
 @app.post("/generate", response_model=GenerateResponse)
 def generate(req: GenerateRequest):
     if "model" not in state:
+        GEN_TOTAL.labels(status="error").inc()
         raise HTTPException(503, "Model not loaded")
+    t0 = time.perf_counter()
     r = state.get("redis")
     key = _cache_key(req.diff)
 
     if r is not None:
         cached = r.get(key)
         if cached:
+            CACHE_EVENTS.labels(event="hit").inc()
+            GEN_TOTAL.labels(status="cached").inc()
+            GEN_LATENCY.observe(time.perf_counter() - t0)
             data = json.loads(cached)
             return GenerateResponse(message=data["message"], model=data["model"], cached=True)
+        CACHE_EVENTS.labels(event="miss").inc()
 
     tok, model, device = state["tok"], state["model"], state["device"]
     prompt = (
@@ -120,4 +137,6 @@ def generate(req: GenerateRequest):
         except Exception:
             pass
 
+    GEN_TOTAL.labels(status="ok").inc()
+    GEN_LATENCY.observe(time.perf_counter() - t0)
     return GenerateResponse(message=msg, model=MODEL_ID, cached=False)
