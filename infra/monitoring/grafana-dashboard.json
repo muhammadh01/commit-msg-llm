@@ -1,0 +1,57 @@
+{
+  "title": "commit-msg-llm",
+  "tags": ["mlops", "llm"],
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "10s",
+  "time": {"from": "now-1h", "to": "now"},
+  "panels": [
+    {
+      "id": 1, "type": "stat", "title": "Total generations",
+      "gridPos": {"x": 0, "y": 0, "w": 4, "h": 4},
+      "targets": [{"expr": "sum(generate_total)", "refId": "A"}],
+      "options": {"colorMode": "value", "graphMode": "area"}
+    },
+    {
+      "id": 2, "type": "stat", "title": "Cache hit rate",
+      "gridPos": {"x": 4, "y": 0, "w": 4, "h": 4},
+      "fieldConfig": {"defaults": {"unit": "percentunit", "decimals": 2}},
+      "targets": [{"expr": "sum(cache_events_total{event=\"hit\"}) / clamp_min(sum(cache_events_total), 1)", "refId": "A"}],
+      "options": {"colorMode": "value", "graphMode": "area"}
+    },
+    {
+      "id": 3, "type": "stat", "title": "P95 latency (s)",
+      "gridPos": {"x": 8, "y": 0, "w": 4, "h": 4},
+      "fieldConfig": {"defaults": {"unit": "s", "decimals": 2}},
+      "targets": [{"expr": "histogram_quantile(0.95, sum by (le) (rate(generate_latency_seconds_bucket[5m])))", "refId": "A"}],
+      "options": {"colorMode": "value", "graphMode": "area"}
+    },
+    {
+      "id": 4, "type": "stat", "title": "Errors (1h)",
+      "gridPos": {"x": 12, "y": 0, "w": 4, "h": 4},
+      "targets": [{"expr": "sum(increase(generate_total{status=\"error\"}[1h]))", "refId": "A"}],
+      "options": {"colorMode": "background", "graphMode": "none"}
+    },
+    {
+      "id": 5, "type": "timeseries", "title": "Request rate by status",
+      "gridPos": {"x": 0, "y": 4, "w": 12, "h": 8},
+      "targets": [{"expr": "sum by (status) (rate(generate_total[1m]))", "legendFormat": "{{status}}", "refId": "A"}]
+    },
+    {
+      "id": 6, "type": "timeseries", "title": "Latency percentiles",
+      "gridPos": {"x": 12, "y": 4, "w": 12, "h": 8},
+      "fieldConfig": {"defaults": {"unit": "s"}},
+      "targets": [
+        {"expr": "histogram_quantile(0.50, sum by (le) (rate(generate_latency_seconds_bucket[5m])))", "legendFormat": "p50", "refId": "A"},
+        {"expr": "histogram_quantile(0.95, sum by (le) (rate(generate_latency_seconds_bucket[5m])))", "legendFormat": "p95", "refId": "B"},
+        {"expr": "histogram_quantile(0.99, sum by (le) (rate(generate_latency_seconds_bucket[5m])))", "legendFormat": "p99", "refId": "C"}
+      ]
+    },
+    {
+      "id": 7, "type": "timeseries", "title": "Cache hits vs misses",
+      "gridPos": {"x": 0, "y": 12, "w": 24, "h": 7},
+      "targets": [{"expr": "sum by (event) (rate(cache_events_total[1m]))", "legendFormat": "{{event}}", "refId": "A"}]
+    }
+  ]
+}
