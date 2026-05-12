@@ -27,7 +27,7 @@ spec:
             - name: MODEL_ID
               value: "Qwen/Qwen2.5-0.5B"
             - name: ADAPTER_PATH
-              value: "muhammadh01/commit-msg-llm-adapter"
+              value: "biighunter/commit-msg-llm-adapter"
             - name: HF_TOKEN
               valueFrom:
                 secretKeyRef: { name: api-secrets, key: HF_TOKEN }
