@@ -6,6 +6,8 @@ metadata:
   labels:
     app: api
 spec:
+  strategy:
+    type: Recreate
   replicas: 1
   selector:
     matchLabels:
@@ -49,6 +51,8 @@ metadata:
   name: api
   namespace: commit-msg
 spec:
+  strategy:
+    type: Recreate
   selector:
     app: api
   ports:
