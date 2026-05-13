@@ -1,96 +1,102 @@
 # commit-msg-llm
 
-> Fine-tuned LLM that writes git commit messages from diffs.
-> Full MLOps lifecycle: train → register → serve → monitor → auto-redeploy.
+> AI-powered commit message generator. Fine-tuned Qwen2.5-0.5B, served from a full MLOps stack.
 
-![CI](https://github.com/muhammadh01/commit-msg-llm/actions/workflows/ci.yml/badge.svg)
-![Python 3.11](https://img.shields.io/badge/python-3.11-blue)
-![License MIT](https://img.shields.io/badge/license-MIT-green)
+**🌍 [Live Demo →](https://commit-msg.durak.dev)**
+
+```
+🎨 https://commit-msg.durak.dev        Frontend (Next.js)
+🔌 https://commit.durak.dev            API (FastAPI)
+📚 https://commit.durak.dev/docs       OpenAPI docs
+📊 https://commit-grafana.durak.dev    Grafana dashboard
+🤗 huggingface.co/biighunter/commit-msg-llm-adapter
+```
 
 ---
 
 ## What it does
 
-```bash
-curl -X POST https://api.durak.dev/generate \
-  -H "Content-Type: application/json" \
-  -d '{"diff":"# MODIFY src/auth.py\n+if user.is_banned: return None"}'
-```
+Paste a `git diff` → get a clean, conventional commit message.
 
-```json
-{"message": "add ban check to login flow", "cached": false}
-```
+Powered by Qwen2.5-0.5B fine-tuned with LoRA on 6,676 real commits from the [CommitChronicle](https://huggingface.co/datasets/JetBrains-Research/commit-chronicle) dataset.
+
+## Stack
+
+| Layer | Tech |
+|---|---|
+| **Training** | Qwen2.5-0.5B · LoRA · PEFT · Kaggle GPU |
+| **Tracking** | MLflow |
+| **Registry** | HuggingFace Hub · ghcr.io |
+| **Serving** | FastAPI · Redis cache · PyTorch |
+| **Infra** | Kubernetes (DigitalOcean) · Helm |
+| **Ingress** | Nginx · cert-manager · Let's Encrypt |
+| **Monitoring** | Prometheus · Grafana · custom metrics |
+| **CI/CD** | GitHub Actions · release-please |
+| **Eval** | BLEU · ROUGE · GPT-4o-mini LLM-as-judge |
+| **Frontend** | Next.js 15 · TypeScript · Tailwind · shadcn/ui · Framer Motion |
 
 ## Architecture
 
 ```
-                       ┌─────────────────┐
-                       │   durak.dev     │
-                       │  Nginx + TLS    │
-                       └────────┬────────┘
-                                │
-                ┌───────────────┴───────────────┐
-                │                               │
-        ┌───────▼────────┐              ┌──────▼───────┐
-        │  FastAPI app   │◄────────────►│    Redis     │
-        │   (Qwen 7B +   │              │    cache     │
-        │   QLoRA)       │              └──────────────┘
-        └───────┬────────┘
-                │
-        ┌───────▼────────┐              ┌──────────────┐
-        │   Prometheus   │◄─────────────│   Grafana    │
-        │    metrics     │              │  dashboards  │
-        └────────────────┘              └──────────────┘
-
-Training pipeline (GitHub Actions):
-CommitChronicle → Kaggle GPU → QLoRA → MLflow → HF Hub → K8s blue-green
+                                ┌──────────────────┐
+                                │  GitHub Actions  │
+                                │   (test→build→   │
+                                │   push→deploy)   │
+                                └─────────┬────────┘
+                                          │
+                                          ▼
+┌─────────┐      HTTPS       ┌──────────────────────────┐
+│ Browser │ ─────────────────│  K8s cluster (DO fra1)   │
+└─────────┘                  │                          │
+                             │  ┌────────┐  ┌─────────┐ │
+                             │  │ web    │──│  api    │ │
+                             │  │ Next.js│  │ FastAPI │ │
+                             │  └────────┘  └────┬────┘ │
+                             │                   │      │
+                             │              ┌────▼────┐ │
+                             │              │  redis  │ │
+                             │              └─────────┘ │
+                             │                          │
+                             │   Prometheus → Grafana   │
+                             └──────────────────────────┘
 ```
 
-## Tech stack
-
-| Layer | Tools |
-|---|---|
-| Model | Qwen2.5-7B + QLoRA (4-bit) |
-| Training | PyTorch, HuggingFace `peft`, `trl`, Kaggle GPU |
-| Tracking | MLflow (params, metrics, artifacts) |
-| Registry | HuggingFace Hub |
-| Serving | FastAPI + vLLM, Redis cache |
-| Infra | Docker, Kubernetes (DigitalOcean), Nginx + Let's Encrypt |
-| Monitoring | Prometheus + Grafana |
-| CI/CD | GitHub Actions (test, build, blue-green deploy) |
-| Eval | BLEU + ROUGE + GPT-4o-mini as judge |
-
-## Quick start
+## Run locally
 
 ```bash
-git clone https://github.com/muhammadh01/commit-msg-llm
-cd commit-msg-llm
-make docker-up
-curl http://localhost:8000/health
+# Backend
+make install
+make serve  # http://localhost:8000
+
+# Frontend
+cd web && npm install && npm run dev  # http://localhost:3000
 ```
 
-## Commands
+## Training
 
 ```bash
-make install        # install python deps
-make train          # local LoRA sanity training
-make serve          # run FastAPI locally
-make test           # run pytest
-make docker-up      # start full stack (api + redis)
-make docker-down    # stop stack
-make docker-logs    # tail api logs
+make data    # download CommitChronicle (~10k samples)
+make train   # LoRA fine-tune (GPU recommended)
+make eval    # BLEU + ROUGE + LLM judge
 ```
 
-## Roadmap
+## Deployment
 
-- [x] **Week 1** — Local training + dockerized API + tests + MLflow
-- [ ] **Week 2** — Real training on Kaggle (10k examples, Qwen 7B QLoRA), GPT-4 eval
-- [ ] **Week 3** — Deploy to DigitalOcean K8s, public at `api.durak.dev`
-- [ ] **Week 4** — Prometheus/Grafana monitoring, auto-redeploy, React frontend
+Push to `main` → GitHub Actions:
+1. Runs tests + lint
+2. Builds Docker image
+3. Pushes to ghcr.io
+4. Rolls out to K8s
+5. Smoke-tests health endpoint
 
-## Author
+## Metrics
 
-Built by [@muhammadh01](https://github.com/muhammadh01) — B.Sc. AI student at JKU Linz, transitioning from DevOps to MLOps.
+Custom Prometheus metrics exposed at `/metrics`:
+- `generate_total{status}` — total generations by status
+- `generate_latency_seconds` — inference latency histogram
+- `cache_events_total{event}` — Redis cache hits/misses
+
+Visualize at [commit-grafana.durak.dev](https://commit-grafana.durak.dev).
 
 ## License
 
